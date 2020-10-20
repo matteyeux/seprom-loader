@@ -1,0 +1,24 @@
+{
+    "pluginmetadataversion": 2,
+    "name": "SEPROM Loader",
+    "type": ["binaryview" ],
+    "api": ["python3"],
+    "description": "Binary View for loading 32 bits and 64 bits Apple SEPROM",
+    "longdescription": "# SEPROM loader\n\n_Binary View for loading 32 bits and 64 bits Secure Enclave Processor ROM embedded in Apple's products_\n\n![](https://raw.githubusercontent.com/matteyeux/seprom-loader/master/demo.PNG)\n\n## Description \nBinary Ninja Binary View plugin for analyzing Apple's SEPROM. \n- Identifies SEPROM architecture    \n- Performs rebase to the correct load address for accurate analysis    \n- Restores some symbols for 64 bits SEPROMs\n\n## Acknowledgments\n\n- [Yui's](https://twitter.com/haiyuidesu) [sephelper](https://github.com/haiyuidesu/sephelper) for IDA PRO\n- BlackwingHQ's [iBoot64Binja](https://github.com/BlackwingHQ/iBoot64Binja)",
+    "license": {
+            "name": "MIT",
+            "text": "Copyright (c) 2020 Mathieu Hautebas\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
+
+    },
+    "platforms": ["Windows", "Linux", "Darwin"],
+    "installinstructions": {
+      "Darwin": "Copy to `~/Library/Application Support/Binary Ninja/plugins/` or use Plugin Manager",
+      "Windows": "Copy to `%APPDATA%\\Binary Ninja\\plugins` or use Plugin Manager",
+      "Linux": "Copy to `~/.binaryninja/plugins/` or use Plugin Manager"
+    },
+    "dependencies": {
+    },
+    "version": "1.0",
+    "author": "matteyeux",
+    "minimumbinaryninjaversion": 2170
+}
