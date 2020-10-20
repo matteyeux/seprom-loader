@@ -86,8 +86,9 @@ class SEPROMView(BinaryView):
             load_settings.update_property("loader.entryPoint", json.dumps({'default': 0}))
         return load_settings
 
-    def on_complete(self, blah):
-        self.find_interesting()
+    def on_complete(self):
+        if self.IS_64:
+            self.find_interesting64()
 
     def resolve_byte_sig_pattern(self, identifier):
         pattern = []
@@ -168,7 +169,7 @@ class SEPROMView(BinaryView):
         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, address, name))
         print(f"[+] {name} @ {hex(address)}")
 
-    def find_interesting(self):
+    def find_interesting64(self):
         self.resolve_byte_sigs("_bzero", "63e47a924200008b")
         self.resolve_byte_sigs("_reload_cache", "1f8708d5")
         self.resolve_byte_sigs("_DERParseInteger", "00010035e80740f9")
