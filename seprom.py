@@ -148,6 +148,7 @@ class SEPROMView(BinaryView):
             addr = self.define_func_from_bytesignature(signature, name)
             if addr  == None:
                 print("[!] Can't find function {}".format(name))
+
         return addr
 
     def define_func_from_bytesignature(self, signature, func_name):
@@ -190,5 +191,15 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_Img4DecodeInit", "20010035c0c20091")
         self.resolve_byte_sigs("__parse_chain", "5a3d0012773d0012")
         self.resolve_byte_sigs("_memcpy", "6380009163e87b92")
+        self.resolve_byte_sigs("_ccn_cmp", "7f0005ebc080809a")
+        self.resolve_byte_sigs("_ccn_sub", "840004eb400000b5")
+        self.resolve_byte_sigs("_DERDecodeItemPartialBufferGetLength", "090440f93f0900f1")
+        self.resolve_byte_sigs("_Img4DecodeEvaluateDictionaryProperties", "e0031f320afd7ed3")
+        self.resolve_byte_sigs("_ccdigest_update", "e100005481fe46d3")
+        self.resolve_byte_sigs("_ccdigest_init", "f40300aa60220091")
+        self.resolve_byte_sigs("_cchmac_init", "692200918a0b8052")
+        self.resolve_byte_sigs("_ccn_add", "840000b1400000b5")
+        self.resolve_byte_sigs("_cc_muxp", "08c120cb2800088a")
+        self.resolve_byte_sigs("_ccn_n", "630400915f0000f1")
 
         self.binary = b''
