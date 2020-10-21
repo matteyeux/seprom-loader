@@ -180,6 +180,20 @@ class SEPROMView(BinaryView):
         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, address, name))
         print(f"[+] {name} @ {hex(address)}")
 
+    def find_panic(self, boot_check_panic_addr):
+        """
+        boot_check_panic has only one MLIL_CALL
+        which is panic.
+        """
+        boot_check_panic = self.get_function_at(boot_check_panic_addr)
+        for block in boot_check_panic.mlil:
+            for instruction in block:
+                if instruction.operation.name == 'MLIL_CALL':
+                    address = instruction.operands[1].constant
+                    panic = self.get_function_at(address)
+                    panic.name = "_panic"
+        return panic
+
     def find_interesting64(self):
         self.resolve_byte_sigs("_bzero", "63e47a924200008b")
         self.resolve_byte_sigs("_reload_cache", "1f8708d5")
@@ -194,7 +208,6 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_DERImg4DecodeFindProperty", "00008052a80a43b2")
         self.resolve_byte_sigs("_DERDecodeSeqContentInit", "090440f90801098b")
         self.resolve_byte_sigs("_DERParseBitString", "080080d25f000039")
-        self.resolve_byte_sigs("_boot_check_panic", "4900c0d20921a8f2")
         self.resolve_byte_sigs("_DERDecodeSeqNext", "e80300f9280108cb")
         self.resolve_byte_sigs("_DERParseBoolean", "080140391ffd0371")
         self.resolve_byte_sigs("_Img4DecodeInit", "20010035c0c20091")
@@ -210,13 +223,16 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_ccn_add", "840000b1400000b5")
         self.resolve_byte_sigs("_cc_muxp", "08c120cb2800088a")
         self.resolve_byte_sigs("_ccn_n", "630400915f0000f1")
-
         self.resolve_byte_sigs("_DEROiCompare", "a10100b4020540f9")
         self.resolve_byte_sigs("_DERImg4DecodeParseManifestProperties", "8002803da13a0091")
         self.resolve_byte_sigs("__Img4DecodeGetPropertyData", "00008052e81740f9")
         self.resolve_byte_sigs("_DERImg4DecodeProperty", "e80740b9080943b2")
         self.resolve_byte_sigs("_DERImg4Decode", "61030054882640a9")
-        img4decodegetpayload = self.resolve_byte_sigs("_Img4DecodeGetPayload", "0081c93c2000803d")
-        self.set_name_from_func_xref("_image4_load", img4decodegetpayload)
 
+        boot_check_panic = self.resolve_byte_sigs("_boot_check_panic", "4900c0d20921a8f2")
+        self.find_panic(boot_check_panic)
+
+        img4decodegetpayload = self.resolve_byte_sigs("_Img4DecodeGetPayload", "0081c93c2000803d")
+        img4_check = self.set_name_from_func_xref("_img4_check", img4decodegetpayload)
+        self.set_name_from_func_xref("_load_sepos", img4_check)
         self.binary = b''
