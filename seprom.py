@@ -192,6 +192,7 @@ class SEPROMView(BinaryView):
                     address = instruction.operands[1].constant
                     panic = self.get_function_at(address)
                     panic.name = "_panic"
+                    print(f"[+] _panic @ {hex(panic.start)}")
         return panic
 
     def find_interesting64(self):
