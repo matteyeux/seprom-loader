@@ -151,6 +151,16 @@ class SEPROMView(BinaryView):
 
         return addr
 
+    def set_name_from_func_xref(self, name, addr):
+        refs = self.get_code_refs(addr)
+        if len(refs) != 0:
+            functions = self.get_functions_containing(refs[0].address)
+            if len(functions) != 0:
+                functions[0].name = name
+                print(f"[+] {name} @ {hex(functions[0].lowest_address)}")
+                return functions[0].lowest_address
+        return None
+
     def define_func_from_bytesignature(self, signature, func_name):
         ptr = self.start
         while ptr < self.end:
@@ -177,7 +187,6 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_verify_pkcs1_sig", "680e0054a11240f9")
         self.resolve_byte_sigs("_DERParseSequence", "e0010035e80740f9")
         self.resolve_byte_sigs("_DERImg4DecodePayload", "330300b4090140f9")
-        self.resolve_byte_sigs("_Img4DecodeGetPayload", "0081c93c2000803d")
         self.resolve_byte_sigs("_verify_chain_signatures", "? 09 00 b4 68 12 40 f9")
         self.resolve_byte_sigs("_DERImg4DecodeFindInSequence", "6002803dfd7b44a9")
         self.resolve_byte_sigs("_Img4DecodeGetPropertyBoolean", "210843b2e0030091")
@@ -201,5 +210,13 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_ccn_add", "840000b1400000b5")
         self.resolve_byte_sigs("_cc_muxp", "08c120cb2800088a")
         self.resolve_byte_sigs("_ccn_n", "630400915f0000f1")
+
+        self.resolve_byte_sigs("_DEROiCompare", "a10100b4020540f9")
+        self.resolve_byte_sigs("_DERImg4DecodeParseManifestProperties", "8002803da13a0091")
+        self.resolve_byte_sigs("__Img4DecodeGetPropertyData", "00008052e81740f9")
+        self.resolve_byte_sigs("_DERImg4DecodeProperty", "e80740b9080943b2")
+        self.resolve_byte_sigs("_DERImg4Decode", "61030054882640a9")
+        img4decodegetpayload = self.resolve_byte_sigs("_Img4DecodeGetPayload", "0081c93c2000803d")
+        self.set_name_from_func_xref("_image4_load", img4decodegetpayload)
 
         self.binary = b''
