@@ -164,9 +164,6 @@ class SEPROMView(BinaryView):
     def define_func_from_bytesignature(self, signature, func_name):
         ptr = self.start
         while ptr < self.end:
-            # Have to convert signature byearray to a string since find_next_data can't handle bytes on stable
-            # fixed on dev in: https://github.com/Vector35/binaryninja-api/commit/c18b89e4cabfc28081a7893ccd4cf8956c9a797f
-            signature = "".join(chr(x) for x in signature)
             ptr = self.find_next_data(ptr, signature)
             if not ptr:
                 break
