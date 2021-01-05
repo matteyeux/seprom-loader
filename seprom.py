@@ -1,20 +1,16 @@
 from binaryninja.architecture import Architecture
-from binaryninja.binaryview import BinaryView, BinaryReader, AnalysisCompletionEvent
+from binaryninja.binaryview import BinaryView, BinaryReader
 from binaryninja.enums import SymbolType, SegmentFlag, Endianness, SectionSemantics
 from binaryninja.types import Symbol
-from binaryninja import Settings
 import binascii
-import json
-import struct
-import traceback
 
-use_default_loader_settings = True
 
 class SEPROMView(BinaryView):
     name = "SEPROM"
     long_name = "SEPROM"
     load_address = 0x0
     IS_64 = False
+
     def __init__(self, data):
         self.reader = BinaryReader(data, Endianness.LittleEndian)
         BinaryView.__init__(self, parent_view=data, file_metadata=data.file)
@@ -26,27 +22,18 @@ class SEPROMView(BinaryView):
 
         self.add_analysis_completion_event(self.on_complete)
 
-        load_settings = self.get_load_settings(self.name)
-        if load_settings is None:
-
-            if self.IS_64:
-                self.load_address = 0x240000000
-                self.arch = Architecture['aarch64']
-                self.platform = self.arch.standalone_platform
-            else:
-                self.load_address = 0x10000000
-                self.arch = Architecture['thumb2']
-                self.platform = self.arch.standalone_platform
+        # set base address
+        if self.IS_64:
+            self.load_address = 0x240000000
+            self.arch = Architecture['aarch64']
+            self.platform = self.arch.standalone_platform
+        else:
+            self.load_address = 0x10000000
+            self.arch = Architecture['thumb2']
+            self.platform = self.arch.standalone_platform
 
             print("Base address : " + hex(self.load_address))
 
-        else:
-            print("Load Settings: ")
-            print(load_settings)
-            arch = load_settings.get_string("loader.architecture", self)
-            self.arch = Architecture[arch]
-            self.platform = self.arch.standalone_platform
-            self.load_address = int(load_settings.get_string("loader.imageBase", self))
 
         self.add_auto_segment(self.load_address, len(self.parent_view), 0, len(self.parent_view), SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable)
         self.add_user_section(self.name, self.load_address, len(self.raw), SectionSemantics.ReadOnlyCodeSectionSemantics)
@@ -58,33 +45,23 @@ class SEPROMView(BinaryView):
 
     @classmethod
     def is_valid_for_data(self, data):
-        if data.read(0xc00, 21) == b'private_build...(root':
+        """Check for a specific string.
+        To see if it's a SEPROM file."""
+        # A11 SEPROM does not have this string and is 64 bits.
+        # I don't have it for further testing, so I leave it as is
+        if data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
             self.IS_64 = True
             print("[seprom_loader] This is a 64 bits SEPROM")
             return True
         elif data.read(0x800, 12) == b'AppleSEPROM-':
             print("[seprom_loader] This is a 32 bits SEPROM")
             return True
+        elif data.read(0x10c00, 12) == b'AppleSEPROM-':
+            self.IS_64 = True
+            return True
         else:
             pass
         return False
-
-    @classmethod
-    def get_load_settings_for_data(self, data):
-        load_settings = Settings("mapped_load_settings")
-        if use_default_loader_settings:
-            load_settings = self.registered_view_type.get_default_load_settings_for_data(data)
-            # specify default load settings that can be overridden (from the UI)
-            overrides = ["loader.architecture", "loader.platform", "loader.entryPoint", "loader.imageBase",
-                         "loader.segments", "loader.sections"]
-            for override in overrides:
-                if load_settings.contains(override):
-                    load_settings.update_property(override, json.dumps({'readOnly': False}))
-
-            # override default setting value
-            load_settings.update_property("loader.imageBase", json.dumps({'default': 0}))
-            load_settings.update_property("loader.entryPoint", json.dumps({'default': 0}))
-        return load_settings
 
     def on_complete(self):
         if self.IS_64:
@@ -174,6 +151,8 @@ class SEPROMView(BinaryView):
         return None
 
     def define_function_at_address(self, address, name):
+        if address is None:
+            return None
         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, address, name))
         print(f"[+] {name} @ {hex(address)}")
 
@@ -183,6 +162,8 @@ class SEPROMView(BinaryView):
         which is panic.
         """
         boot_check_panic = self.get_function_at(boot_check_panic_addr)
+        if boot_check_panic is None:
+            return None
         for block in boot_check_panic.mlil:
             for instruction in block:
                 if instruction.operation.name == 'MLIL_CALL':
@@ -191,6 +172,30 @@ class SEPROMView(BinaryView):
                     panic.name = "_panic"
                     print(f"[+] _panic @ {hex(panic.start)}")
         return panic
+
+    def find_image4_validate_property_callback(self):
+        # find egi0 tag
+        egi0_tag = self.find_next_constant(self.load_address, 0x424f5244)
+        img4_validate_property_callback = self.get_functions_containing(egi0_tag)[0]
+        return img4_validate_property_callback
+
+    def find_save_img4_tag_value(self, target_function):
+        for block in target_function.mlil:
+            for instruction in block:
+                # check for Certificate Production Status (CPRO) tag
+                if "0x4350524f" in str(instruction) and instruction.operation.name == "MLIL_CALL":
+                    addr = instruction.operands[1].constant
+                    function = self.get_function_at(addr)
+                    return function
+
+    def find_image4_verify_number_relation(self, target_function):
+        for block in target_function.mlil:
+            for instruction in block:
+                # check for Board ID (BORD) tag
+                if "0x424f5244" in str(instruction) and instruction.operation.name == "MLIL_CALL":
+                    addr = instruction.operands[1].constant
+                    function = self.get_function_at(addr)
+                    return function
 
     def find_interesting64(self):
         self.resolve_byte_sigs("_bzero", "63e47a924200008b")
@@ -201,7 +206,6 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_DERImg4DecodePayload", "330300b4090140f9")
         self.resolve_byte_sigs("_verify_chain_signatures", "? 09 00 b4 68 12 40 f9")
         self.resolve_byte_sigs("_DERImg4DecodeFindInSequence", "6002803dfd7b44a9")
-        self.resolve_byte_sigs("_Img4DecodeGetPropertyBoolean", "210843b2e0030091")
         self.resolve_byte_sigs("_Img4DecodeCopyPayloadDigest", "? ? 02 91 e0 03 15 aa")
         self.resolve_byte_sigs("_DERImg4DecodeFindProperty", "00008052a80a43b2")
         self.resolve_byte_sigs("_DERDecodeSeqContentInit", "090440f90801098b")
@@ -228,9 +232,26 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_DERImg4Decode", "61030054882640a9")
 
         boot_check_panic = self.resolve_byte_sigs("_boot_check_panic", "4900c0d20921a8f2")
-        self.find_panic(boot_check_panic)
+        if boot_check_panic is not None:
+            self.find_panic(boot_check_panic)
 
         img4decodegetpayload = self.resolve_byte_sigs("_Img4DecodeGetPayload", "0081c93c2000803d")
-        img4_check = self.set_name_from_func_xref("_img4_check", img4decodegetpayload)
-        self.set_name_from_func_xref("_load_sepos", img4_check)
+        image4_load = self.set_name_from_func_xref("_image4_load", img4decodegetpayload)
+        self.set_name_from_func_xref("_load_sepos", image4_load)
+
+        write_ktrr_unknown_el1 = self.find_next_text(self.load_address, "s3_4_c15_c2_5")
+        self.define_function_at_address(write_ktrr_unknown_el1, "_write_ktrr_unknown_el1")
+
+        read_ctrr_lock = self.find_next_text(self.load_address, "s3_4_c15_c2_2")
+        self.define_function_at_address(read_ctrr_lock, "_read_ctrr_lock")
+
+        img4_validate_property_callback = self.find_image4_validate_property_callback()
+        self.define_function_at_address(img4_validate_property_callback.start, "_img4_validate_property_callback")
+
+        save_img4_tag_value = self.find_save_img4_tag_value(img4_validate_property_callback)
+        self.define_function_at_address(save_img4_tag_value.start, "_save_img4_tag_value")
+
+        img4_verify_number_relation = self.find_image4_verify_number_relation(img4_validate_property_callback)
+        self.define_function_at_address(img4_verify_number_relation.start, "_image4_verify_number_relation")
+
         self.binary = b''
