@@ -47,17 +47,12 @@ class SEPROMView(BinaryView):
     def is_valid_for_data(self, data):
         """Check for a specific string.
         To see if it's a SEPROM file."""
-        # A11 SEPROM does not have this string and is 64 bits.
-        # I don't have it for further testing, so I leave it as is
         if data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
             self.IS_64 = True
             print("[seprom_loader] This is a 64 bits SEPROM")
             return True
         elif data.read(0x800, 12) == b'AppleSEPROM-':
             print("[seprom_loader] This is a 32 bits SEPROM")
-            return True
-        elif data.read(0x10c00, 12) == b'AppleSEPROM-':
-            self.IS_64 = True
             return True
         else:
             pass
