@@ -124,6 +124,8 @@ class SEPROMView(BinaryView):
         return addr
 
     def set_name_from_func_xref(self, name, addr):
+        if addr is None:
+            return None
         refs = self.get_code_refs(addr)
         if len(refs) != 0:
             functions = self.get_functions_containing(refs[0].address)
@@ -171,6 +173,8 @@ class SEPROMView(BinaryView):
     def find_image4_validate_property_callback(self):
         # find egi0 tag
         egi0_tag = self.find_next_constant(self.load_address, 0x424f5244)
+        if egi0_tag is None:
+            return None
         img4_validate_property_callback = self.get_functions_containing(egi0_tag)[0]
         return img4_validate_property_callback
 
@@ -241,12 +245,13 @@ class SEPROMView(BinaryView):
         self.define_function_at_address(read_ctrr_lock, "_read_ctrr_lock")
 
         img4_validate_property_callback = self.find_image4_validate_property_callback()
-        self.define_function_at_address(img4_validate_property_callback.start, "_img4_validate_property_callback")
+        if img4_validate_property_callback is not None:
+            self.define_function_at_address(img4_validate_property_callback.start, "_img4_validate_property_callback")
 
-        save_img4_tag_value = self.find_save_img4_tag_value(img4_validate_property_callback)
-        self.define_function_at_address(save_img4_tag_value.start, "_save_img4_tag_value")
+        # save_img4_tag_value = self.find_save_img4_tag_value(img4_validate_property_callback)
+        # self.define_function_at_address(save_img4_tag_value.start, "_save_img4_tag_value")
 
-        img4_verify_number_relation = self.find_image4_verify_number_relation(img4_validate_property_callback)
-        self.define_function_at_address(img4_verify_number_relation.start, "_image4_verify_number_relation")
+        # img4_verify_number_relation = self.find_image4_verify_number_relation(img4_validate_property_callback)
+        # self.define_function_at_address(img4_verify_number_relation.start, "_image4_verify_number_relation")
 
         self.binary = b''
