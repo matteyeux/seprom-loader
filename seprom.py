@@ -92,7 +92,7 @@ class SEPROMView(BinaryView):
                     break
 
                 instruction_length = self.get_instruction_length(br.offset)
-                #account for unknown or bad instruction
+                # account for unknown or bad instruction
                 if instruction_length == 0:
                     break
                 br.offset += instruction_length
@@ -248,10 +248,10 @@ class SEPROMView(BinaryView):
         if img4_validate_property_callback is not None:
             self.define_function_at_address(img4_validate_property_callback.start, "_img4_validate_property_callback")
 
-        # save_img4_tag_value = self.find_save_img4_tag_value(img4_validate_property_callback)
-        # self.define_function_at_address(save_img4_tag_value.start, "_save_img4_tag_value")
+            save_img4_tag_value = self.find_save_img4_tag_value(img4_validate_property_callback)
+            self.define_function_at_address(save_img4_tag_value.start, "_save_img4_tag_value")
 
-        # img4_verify_number_relation = self.find_image4_verify_number_relation(img4_validate_property_callback)
-        # self.define_function_at_address(img4_verify_number_relation.start, "_image4_verify_number_relation")
+            img4_verify_number_relation = self.find_image4_verify_number_relation(img4_validate_property_callback)
+            self.define_function_at_address(img4_verify_number_relation.start, "_image4_verify_number_relation")
 
         self.binary = b''
