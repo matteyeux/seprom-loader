@@ -9,7 +9,6 @@ class SEPROMView(BinaryView):
     name = "SEPROM"
     long_name = "SEPROM"
     load_address = 0x0
-    IS_64 = False
 
     def __init__(self, data):
         self.reader = BinaryReader(data, Endianness.LittleEndian)
@@ -23,7 +22,7 @@ class SEPROMView(BinaryView):
         self.add_analysis_completion_event(self.on_complete)
 
         # set base address
-        if self.IS_64:
+        if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
             self.load_address = 0x240000000
             self.arch = Architecture['aarch64']
             self.platform = self.arch.standalone_platform
@@ -48,15 +47,11 @@ class SEPROMView(BinaryView):
         """Check for a specific string.
         To see if it's a SEPROM file."""
         if data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
-            self.IS_64 = True
-            print("[seprom_loader] This is a 64 bits SEPROM")
             return True
         elif data.read(0x800, 12) == b'AppleSEPROM-':
-            print("[seprom_loader] This is a 32 bits SEPROM")
             return True
         else:
-            pass
-        return False
+            return False
 
     def on_complete(self):
         if self.IS_64:
@@ -127,8 +122,9 @@ class SEPROMView(BinaryView):
         if addr is None:
             return None
         refs = self.get_code_refs(addr)
-        if len(refs) != 0:
-            functions = self.get_functions_containing(refs[0].address)
+        refs_list = list(refs) 
+        if refs_list != 0:
+            functions = self.get_functions_containing(refs_list[0].address)
             if len(functions) != 0:
                 functions[0].name = name
                 print(f"[+] {name} @ {hex(functions[0].lowest_address)}")
