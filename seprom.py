@@ -22,7 +22,8 @@ class SEPROMView(BinaryView):
         self.add_analysis_completion_event(self.on_complete)
 
         # set base address
-        if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+        #if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+        if self.is_64b():
             self.load_address = 0x240000000
             self.arch = Architecture['aarch64']
             self.platform = self.arch.standalone_platform
@@ -54,8 +55,14 @@ class SEPROMView(BinaryView):
             return False
 
     def on_complete(self):
-        if self.IS_64:
+        if self.is_64b():
             self.find_interesting64()
+
+    def is_64b(self) -> bool:
+        if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+            return True
+        else:
+            return False
 
     def resolve_byte_sig_pattern(self, identifier):
         pattern = []
