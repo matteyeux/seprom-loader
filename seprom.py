@@ -22,7 +22,7 @@ class SEPROMView(BinaryView):
         self.add_analysis_completion_event(self.on_complete)
 
         # set base address
-        #if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+        # if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
         if self.is_64b():
             self.load_address = 0x240000000
             self.arch = Architecture['aarch64']
@@ -34,10 +34,23 @@ class SEPROMView(BinaryView):
 
             print(f"Base address : {hex(self.load_address)}")
 
-        self.add_auto_segment(self.load_address, self.parent_view.length, 0, self.parent_view.length, SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable)
-        self.add_user_section(self.name, self.load_address, self.raw.length, SectionSemantics.ReadOnlyCodeSectionSemantics)
+        self.add_auto_segment(
+            self.load_address,
+            self.parent_view.length,
+            0,
+            self.parent_view.length,
+            SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable,
+        )
+        self.add_user_section(
+            self.name,
+            self.load_address,
+            self.raw.length,
+            SectionSemantics.ReadOnlyCodeSectionSemantics,
+        )
         self.add_entry_point(self.load_address)
-        self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, self.load_address, '_start'))
+        self.define_auto_symbol(
+            Symbol(SymbolType.FunctionSymbol, self.load_address, '_start')
+        )
         self.update_analysis()
 
         return True
@@ -46,7 +59,7 @@ class SEPROMView(BinaryView):
     def is_valid_for_data(self, data):
         """Check for a specific string.
         To see if it's a SEPROM file."""
-        if data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+        if data.read(0xC00, 15) in [b'private_build..', b'AppleSEPROM-323']:
             return True
         elif data.read(0x800, 12) == b'AppleSEPROM-':
             return True
@@ -58,7 +71,7 @@ class SEPROMView(BinaryView):
             self.find_interesting64()
 
     def is_64b(self) -> bool:
-        if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+        if self.data.read(0xC00, 15) in [b'private_build..', b'AppleSEPROM-323']:
             return True
         else:
             return False
@@ -76,7 +89,9 @@ class SEPROMView(BinaryView):
         for function in self.functions:
             br.seek(function.start)
 
-            while self.get_functions_containing(br.offset + length) != None and function in self.get_functions_containing(br.offset + length):
+            while self.get_functions_containing(
+                br.offset + length
+            ) != None and function in self.get_functions_containing(br.offset + length):
                 found = True
                 count = 0
                 for entry in pattern:
@@ -116,10 +131,12 @@ class SEPROMView(BinaryView):
             try:
                 signature = binascii.unhexlify(sequence)
             except binascii.Error:
-                print(f"[!] Bad Signature for {name}! Must be hex encoded string, got: {sequence}")
+                print(
+                    f"[!] Bad Signature for {name}! Must be hex encoded string, got: {sequence}"
+                )
                 return None
             addr = self.define_func_from_bytesignature(signature, name)
-            if addr  == None:
+            if addr == None:
                 print(f"[!] Can't find function {name}")
 
         return addr
@@ -128,7 +145,7 @@ class SEPROMView(BinaryView):
         if addr is None:
             return None
         refs = self.get_code_refs(addr)
-        refs_list = list(refs) 
+        refs_list = list(refs)
         if refs_list != 0:
             functions = self.get_functions_containing(refs_list[0].address)
             if len(functions) != 0:
@@ -174,7 +191,7 @@ class SEPROMView(BinaryView):
 
     def find_image4_validate_property_callback(self):
         # find egi0 tag
-        egi0_tag = self.find_next_constant(self.load_address, 0x424f5244)
+        egi0_tag = self.find_next_constant(self.load_address, 0x424F5244)
         if egi0_tag is None:
             return None
         img4_validate_property_callback = self.get_functions_containing(egi0_tag)[0]
@@ -184,7 +201,10 @@ class SEPROMView(BinaryView):
         for block in target_function.mlil:
             for instruction in block:
                 # check for Certificate Production Status (CPRO) tag
-                if "0x4350524f" in str(instruction) and instruction.operation.name == "MLIL_CALL":
+                if (
+                    "0x4350524f" in str(instruction)
+                    and instruction.operation.name == "MLIL_CALL"
+                ):
                     addr = instruction.operands[1].constant
                     function = self.get_function_at(addr)
                     return function
@@ -193,7 +213,10 @@ class SEPROMView(BinaryView):
         for block in target_function.mlil:
             for instruction in block:
                 # check for Board ID (BORD) tag
-                if "0x424f5244" in str(instruction) and instruction.operation.name == "MLIL_CALL":
+                if (
+                    "0x424f5244" in str(instruction)
+                    and instruction.operation.name == "MLIL_CALL"
+                ):
                     addr = instruction.operands[1].constant
                     function = self.get_function_at(addr)
                     return function
@@ -218,8 +241,12 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_memcpy", "6380009163e87b92")
         self.resolve_byte_sigs("_ccn_cmp", "7f0005ebc080809a")
         self.resolve_byte_sigs("_ccn_sub", "840004eb400000b5")
-        self.resolve_byte_sigs("_DERDecodeItemPartialBufferGetLength", "090440f93f0900f1")
-        self.resolve_byte_sigs("_Img4DecodeEvaluateDictionaryProperties", "e0031f320afd7ed3")
+        self.resolve_byte_sigs(
+            "_DERDecodeItemPartialBufferGetLength", "090440f93f0900f1"
+        )
+        self.resolve_byte_sigs(
+            "_Img4DecodeEvaluateDictionaryProperties", "e0031f320afd7ed3"
+        )
         self.resolve_byte_sigs("_ccdigest_update", "e100005481fe46d3")
         self.resolve_byte_sigs("_ccdigest_init", "f40300aa60220091")
         self.resolve_byte_sigs("_cchmac_init", "692200918a0b8052")
@@ -227,33 +254,52 @@ class SEPROMView(BinaryView):
         self.resolve_byte_sigs("_cc_muxp", "08c120cb2800088a")
         self.resolve_byte_sigs("_ccn_n", "630400915f0000f1")
         self.resolve_byte_sigs("_DEROiCompare", "a10100b4020540f9")
-        self.resolve_byte_sigs("_DERImg4DecodeParseManifestProperties", "8002803da13a0091")
+        self.resolve_byte_sigs(
+            "_DERImg4DecodeParseManifestProperties", "8002803da13a0091"
+        )
         self.resolve_byte_sigs("__Img4DecodeGetPropertyData", "00008052e81740f9")
         self.resolve_byte_sigs("_DERImg4DecodeProperty", "e80740b9080943b2")
         self.resolve_byte_sigs("_DERImg4Decode", "61030054882640a9")
 
-        boot_check_panic = self.resolve_byte_sigs("_boot_check_panic", "4900c0d20921a8f2")
+        boot_check_panic = self.resolve_byte_sigs(
+            "_boot_check_panic", "4900c0d20921a8f2"
+        )
         if boot_check_panic is not None:
             self.find_panic(boot_check_panic)
 
-        img4decodegetpayload = self.resolve_byte_sigs("_Img4DecodeGetPayload", "0081c93c2000803d")
+        img4decodegetpayload = self.resolve_byte_sigs(
+            "_Img4DecodeGetPayload", "0081c93c2000803d"
+        )
         image4_load = self.set_name_from_func_xref("_image4_load", img4decodegetpayload)
         self.set_name_from_func_xref("_load_sepos", image4_load)
 
         write_ktrr_unknown_el1 = self.find_next_text(self.load_address, "s3_4_c15_c2_5")
-        self.define_function_at_address(write_ktrr_unknown_el1, "_write_ktrr_unknown_el1")
+        self.define_function_at_address(
+            write_ktrr_unknown_el1, "_write_ktrr_unknown_el1"
+        )
 
         read_ctrr_lock = self.find_next_text(self.load_address, "s3_4_c15_c2_2")
         self.define_function_at_address(read_ctrr_lock, "_read_ctrr_lock")
 
         img4_validate_property_callback = self.find_image4_validate_property_callback()
         if img4_validate_property_callback is not None:
-            self.define_function_at_address(img4_validate_property_callback.start, "_img4_validate_property_callback")
+            self.define_function_at_address(
+                img4_validate_property_callback.start,
+                "_img4_validate_property_callback",
+            )
 
-            save_img4_tag_value = self.find_save_img4_tag_value(img4_validate_property_callback)
-            self.define_function_at_address(save_img4_tag_value.start, "_save_img4_tag_value")
+            save_img4_tag_value = self.find_save_img4_tag_value(
+                img4_validate_property_callback
+            )
+            self.define_function_at_address(
+                save_img4_tag_value.start, "_save_img4_tag_value"
+            )
 
-            img4_verify_number_relation = self.find_image4_verify_number_relation(img4_validate_property_callback)
-            self.define_function_at_address(img4_verify_number_relation.start, "_image4_verify_number_relation")
+            img4_verify_number_relation = self.find_image4_verify_number_relation(
+                img4_validate_property_callback
+            )
+            self.define_function_at_address(
+                img4_verify_number_relation.start, "_image4_verify_number_relation"
+            )
 
         self.binary = b''
