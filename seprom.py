@@ -32,8 +32,7 @@ class SEPROMView(BinaryView):
             self.arch = Architecture['thumb2']
             self.platform = self.arch.standalone_platform
 
-            print("Base address : " + hex(self.load_address))
-
+            print(f"Base address : {hex(self.load_address)}")
 
         self.add_auto_segment(self.load_address, self.parent_view.length, 0, self.parent_view.length, SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable)
         self.add_user_section(self.name, self.load_address, self.raw.length, SectionSemantics.ReadOnlyCodeSectionSemantics)
@@ -112,16 +111,16 @@ class SEPROMView(BinaryView):
             if addr:
                 self.define_function_at_address(addr, name)
             else:
-                print("[!] Can't find function {}".format(name))
+                print(f"[!] Can't find function {name}")
         else:
             try:
                 signature = binascii.unhexlify(sequence)
             except binascii.Error:
-                print("[!] Bad Signature for {}! Must be hex encoded string, got: {}.".format(name, sequence))
+                print(f"[!] Bad Signature for {name}! Must be hex encoded string, got: {sequence}")
                 return None
             addr = self.define_func_from_bytesignature(signature, name)
             if addr  == None:
-                print("[!] Can't find function {}".format(name))
+                print(f"[!] Can't find function {name}")
 
         return addr
 
