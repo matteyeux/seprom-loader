@@ -17,7 +17,7 @@ class SEPROMView(BinaryView):
 
     def init(self):
         self.raw = self.data
-        self.binary = self.raw.read(0, len(self.raw))
+        self.binary = self.raw.read(0, self.raw.length)
 
         self.add_analysis_completion_event(self.on_complete)
 
@@ -35,8 +35,8 @@ class SEPROMView(BinaryView):
             print("Base address : " + hex(self.load_address))
 
 
-        self.add_auto_segment(self.load_address, len(self.parent_view), 0, len(self.parent_view), SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable)
-        self.add_user_section(self.name, self.load_address, len(self.raw), SectionSemantics.ReadOnlyCodeSectionSemantics)
+        self.add_auto_segment(self.load_address, self.parent_view.length, 0, self.parent_view.length, SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable)
+        self.add_user_section(self.name, self.load_address, self.raw.length, SectionSemantics.ReadOnlyCodeSectionSemantics)
         self.add_entry_point(self.load_address)
         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, self.load_address, '_start'))
         self.update_analysis()
