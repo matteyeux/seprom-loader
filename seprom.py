@@ -22,11 +22,16 @@ class SEPROMView(BinaryView):
         self.add_analysis_completion_event(self.on_complete)
 
         # set base address
-        # if  self.data.read(0xc00, 15) in [b'private_build..', b'AppleSEPROM-323']:
         if self.is_64b():
-            self.load_address = 0x240000000
             self.arch = Architecture['aarch64']
             self.platform = self.arch.standalone_platform
+            seprom_version = self.rom_version.decode()[12:15]
+
+            if seprom_version.isdigit() and int(seprom_version) >= 520:
+                self.load_address = 0x25c000000
+            else:
+                self.load_address = 0x240000000
+
         else:
             self.load_address = 0x10000000
             self.arch = Architecture['thumb2']
@@ -59,7 +64,7 @@ class SEPROMView(BinaryView):
     def is_valid_for_data(self, data):
         """Check for a specific string.
         To see if it's a SEPROM file."""
-        if data.read(0xC00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+        if data.read(0xC00, 15) in [b'private_build..', b'AppleSEPROM-323', b'AppleSEPROM-520']:
             return True
         elif data.read(0x800, 12) == b'AppleSEPROM-':
             return True
@@ -71,7 +76,8 @@ class SEPROMView(BinaryView):
             self.find_interesting64()
 
     def is_64b(self) -> bool:
-        if self.data.read(0xC00, 15) in [b'private_build..', b'AppleSEPROM-323']:
+        self.rom_version = self.data.read(0xC00, 15)
+        if self.rom_version in [b'private_build..', b'AppleSEPROM-323', b'AppleSEPROM-520']:
             return True
         else:
             return False
