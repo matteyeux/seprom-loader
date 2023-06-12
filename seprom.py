@@ -14,24 +14,23 @@ class SEPROMView(BinaryView):
         self.reader = BinaryReader(data, Endianness.LittleEndian)
         BinaryView.__init__(self, parent_view=data, file_metadata=data.file)
         self.data = data
+        self.version = ()
 
     def init(self):
         self.raw = self.data
         self.binary = self.raw.read(0, self.raw.length)
-
         self.add_analysis_completion_event(self.on_complete)
 
         # set base address
         if self.is_64b():
             self.arch = Architecture['aarch64']
             self.platform = self.arch.standalone_platform
-            seprom_version = self.rom_version.decode()[12:15]
 
-            if seprom_version.isdigit() and int(seprom_version) >= 520:
+            # let's compare version with A15 SEPROM which seems to be the only one with a new base addr
+            if self.version >= self.parse_version("520.400.46.200.4"):
                 self.load_address = 0x25c000000
             else:
                 self.load_address = 0x240000000
-
         else:
             self.load_address = 0x10000000
             self.arch = Architecture['thumb2']
@@ -76,11 +75,28 @@ class SEPROMView(BinaryView):
             self.find_interesting64()
 
     def is_64b(self) -> bool:
-        self.rom_version = self.data.read(0xC00, 15)
-        if self.rom_version in [b'private_build..', b'AppleSEPROM-323', b'AppleSEPROM-520']:
+        version = "1.2.3"
+        minimal_version = self.parse_version("323.0.0.1.15") # First 64 bits SEPROM
+        rom_version = self.data.read(0xC00, 0x1c)
+
+        try:
+            version = rom_version.decode().replace("AppleSEPROM-", "")
+        except UnicodeDecodeError:
+            self.version = version
+
+        if  b'private_build..' in rom_version:
             return True
         else:
-            return False
+            self.version = self.parse_version(version)
+            if self.version >= minimal_version:
+                return True
+            else:
+                return False
+
+    def parse_version(self, version: str) -> tuple:
+        """https://stackoverflow.com/a/11887825."""
+        version_list = [item.replace('\x00', '') for item in version.split(".")]
+        return tuple(map(int, (version_list)))
 
     def resolve_byte_sig_pattern(self, identifier):
         pattern = []
