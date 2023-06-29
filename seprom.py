@@ -63,7 +63,7 @@ class SEPROMView(BinaryView):
     def is_valid_for_data(self, data):
         """Check for a specific string.
         To see if it's a SEPROM file."""
-        if data.read(0xC00, 15) in [b'private_build..', b'AppleSEPROM-323', b'AppleSEPROM-520']:
+        if data.read(0xC00, 12) in [b'private_buil', b'AppleSEPROM-']:
             return True
         elif data.read(0x800, 12) == b'AppleSEPROM-':
             return True
