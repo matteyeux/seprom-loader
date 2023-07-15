@@ -1,8 +1,14 @@
-from binaryninja.architecture import Architecture
-from binaryninja.binaryview import BinaryView, BinaryReader
-from binaryninja.enums import SymbolType, SegmentFlag, Endianness, SectionSemantics
-from binaryninja.types import Symbol
 import binascii
+from typing import Optional
+
+import binaryninja
+from binaryninja.architecture import Architecture
+from binaryninja.binaryview import BinaryReader
+from binaryninja.binaryview import BinaryView
+from binaryninja.enums import SectionSemantics
+from binaryninja.enums import SegmentFlag
+from binaryninja.enums import SymbolType
+from binaryninja.types import Symbol
 
 
 class SEPROMView(BinaryView):
@@ -11,24 +17,22 @@ class SEPROMView(BinaryView):
     load_address = 0x0
 
     def __init__(self, data):
-        self.reader = BinaryReader(data, Endianness.LittleEndian)
         BinaryView.__init__(self, parent_view=data, file_metadata=data.file)
         self.data = data
         self.version = ()
+        self.is_64 = self.is_64b()
 
-    def init(self):
-        self.raw = self.data
-        self.binary = self.raw.read(0, self.raw.length)
+    def init(self) -> bool:
         self.add_analysis_completion_event(self.on_complete)
 
-        # set base address
-        if self.is_64b():
+        if self.is_64:
             self.arch = Architecture['aarch64']
+
             self.platform = self.arch.standalone_platform
 
             # let's compare version with A15 SEPROM which seems to be the only one with a new base addr
             if self.version >= self.parse_version("520.400.46.200.4"):
-                self.load_address = 0x25c000000
+                self.load_address = 0x25C000000
             else:
                 self.load_address = 0x240000000
         else:
@@ -36,19 +40,17 @@ class SEPROMView(BinaryView):
             self.arch = Architecture['thumb2']
             self.platform = self.arch.standalone_platform
 
-            print(f"Base address : {hex(self.load_address)}")
-
         self.add_auto_segment(
             self.load_address,
-            self.parent_view.length,
+            self.data.length,
             0,
-            self.parent_view.length,
+            self.data.length,
             SegmentFlag.SegmentReadable | SegmentFlag.SegmentExecutable,
         )
         self.add_user_section(
             self.name,
             self.load_address,
-            self.raw.length,
+            self.data.length,
             SectionSemantics.ReadOnlyCodeSectionSemantics,
         )
         self.add_entry_point(self.load_address)
@@ -60,7 +62,7 @@ class SEPROMView(BinaryView):
         return True
 
     @classmethod
-    def is_valid_for_data(self, data):
+    def is_valid_for_data(self, data) -> bool:
         """Check for a specific string.
         To see if it's a SEPROM file."""
         if data.read(0xC00, 12) in [b'private_buil', b'AppleSEPROM-']:
@@ -70,35 +72,38 @@ class SEPROMView(BinaryView):
         else:
             return False
 
-    def on_complete(self):
-        if self.is_64b():
-            self.find_interesting64()
+    def parse_version(self, version: str) -> tuple:
+        """https://stackoverflow.com/a/11887825."""
+        version_list = [item.replace('\x00', '') for item in version.split(".")]
+        return tuple(map(int, (version_list)))
+
+    def perform_get_address_size(self) -> int:
+        return self.arch.address_size
 
     def is_64b(self) -> bool:
         version = "1.2.3"
-        minimal_version = self.parse_version("323.0.0.1.15") # First 64 bits SEPROM
-        rom_version = self.data.read(0xC00, 0x1c)
+        minimal_version = self.parse_version("323.0.0.1.15")  # First 64 bits SEPROM
+        rom_version = self.data.read(0xC00, 0x1C)
+
+        if rom_version == b'\x00' * 0x1C:
+            return False
 
         try:
             version = rom_version.decode().replace("AppleSEPROM-", "")
         except UnicodeDecodeError:
             self.version = version
 
-        if  b'private_build..' in rom_version:
+        if b'private_build..' in rom_version:
             return True
         else:
             self.version = self.parse_version(version)
-            if self.version >= minimal_version:
-                return True
-            else:
-                return False
+            return self.version >= minimal_version
 
-    def parse_version(self, version: str) -> tuple:
-        """https://stackoverflow.com/a/11887825."""
-        version_list = [item.replace('\x00', '') for item in version.split(".")]
-        return tuple(map(int, (version_list)))
+    def on_complete(self):
+        if self.is_64:
+            self.find_interesting64()
 
-    def resolve_byte_sig_pattern(self, identifier):
+    def resolve_byte_sig_pattern(self, identifier) -> Optional[int]:
         pattern = []
         for byte in identifier.split(' '):
             if byte == '?':
@@ -111,9 +116,10 @@ class SEPROMView(BinaryView):
         for function in self.functions:
             br.seek(function.start)
 
+            offset_length = br.offset + length
             while self.get_functions_containing(
-                br.offset + length
-            ) != None and function in self.get_functions_containing(br.offset + length):
+                offset_length
+            ) is not None and function in self.get_functions_containing(offset_length):
                 found = True
                 count = 0
                 for entry in pattern:
@@ -142,7 +148,7 @@ class SEPROMView(BinaryView):
         else:
             return self.get_functions_containing(result)[0].lowest_address
 
-    def resolve_byte_sigs(self, name, sequence):
+    def resolve_byte_sigs(self, name, sequence) -> Optional[int]:
         if "?" in sequence:
             addr = self.resolve_byte_sig_pattern(sequence)
             if addr:
@@ -158,12 +164,12 @@ class SEPROMView(BinaryView):
                 )
                 return None
             addr = self.define_func_from_bytesignature(signature, name)
-            if addr == None:
+            if addr is None:
                 print(f"[!] Can't find function {name}")
 
         return addr
 
-    def set_name_from_func_xref(self, name, addr):
+    def set_name_from_func_xref(self, name, addr) -> Optional[int]:
         if addr is None:
             return None
         refs = self.get_code_refs(addr)
@@ -176,28 +182,27 @@ class SEPROMView(BinaryView):
                 return functions[0].lowest_address
         return None
 
-    def perform_get_address_size(self) -> int:
-        return self.address_size
-
-    def define_func_from_bytesignature(self, signature, func_name):
+    def define_func_from_bytesignature(self, signature, func_name) -> Optional[int]:
         ptr = self.start
         while ptr < self.end:
             ptr = self.find_next_data(ptr, signature)
             if not ptr:
                 break
             # Only finds first occurance of signature - might want to warn if muliple hits...
-            func_start = self.get_functions_containing(ptr)[0].lowest_address
-            self.define_function_at_address(func_start, func_name)
-            return func_start
+            func = self.get_functions_containing(ptr)[0]
+            func.name = func_name
+            return func.start
         return None
 
-    def define_function_at_address(self, address, name):
+    def define_function_at_address(self, address: Optional[int], name: str) -> None:
         if address is None:
             return None
         self.define_auto_symbol(Symbol(SymbolType.FunctionSymbol, address, name))
         print(f"[+] {name} @ {hex(address)}")
 
-    def find_panic(self, boot_check_panic_addr):
+    def find_panic(
+        self, boot_check_panic_addr
+    ) -> Optional[binaryninja.function.Function]:
         """
         boot_check_panic has only one MLIL_CALL
         which is panic.
@@ -214,7 +219,9 @@ class SEPROMView(BinaryView):
                     print(f"[+] _panic @ {hex(panic.start)}")
         return panic
 
-    def find_image4_validate_property_callback(self):
+    def find_image4_validate_property_callback(
+        self,
+    ) -> Optional[binaryninja.function.Function]:
         # find egi0 tag
         egi0_tag = self.find_next_constant(self.load_address, 0x424F5244)
         if egi0_tag is None:
@@ -222,7 +229,9 @@ class SEPROMView(BinaryView):
         img4_validate_property_callback = self.get_functions_containing(egi0_tag)[0]
         return img4_validate_property_callback
 
-    def find_save_img4_tag_value(self, target_function):
+    def find_save_img4_tag_value(
+        self, target_function
+    ) -> Optional[binaryninja.function.Function]:
         for block in target_function.mlil:
             for instruction in block:
                 # check for Certificate Production Status (CPRO) tag
@@ -233,8 +242,11 @@ class SEPROMView(BinaryView):
                     addr = instruction.operands[1].constant
                     function = self.get_function_at(addr)
                     return function
+        return None
 
-    def find_image4_verify_number_relation(self, target_function):
+    def find_image4_verify_number_relation(
+        self, target_function
+    ) -> Optional[binaryninja.function.Function]:
         for block in target_function.mlil:
             for instruction in block:
                 # check for Board ID (BORD) tag
@@ -245,17 +257,16 @@ class SEPROMView(BinaryView):
                     addr = instruction.operands[1].constant
                     function = self.get_function_at(addr)
                     return function
+        return None
 
-    def find_interesting64(self):
+    def find_interesting64(self) -> None:
         self.resolve_byte_sigs("_bzero", "63e47a924200008b")
         self.resolve_byte_sigs("_reload_cache", "1f8708d5")
         self.resolve_byte_sigs("_DERParseInteger", "00010035e80740f9")
         self.resolve_byte_sigs("_verify_pkcs1_sig", "680e0054a11240f9")
         self.resolve_byte_sigs("_DERParseSequence", "e0010035e80740f9")
         self.resolve_byte_sigs("_DERImg4DecodePayload", "330300b4090140f9")
-        self.resolve_byte_sigs("_verify_chain_signatures", "? 09 00 b4 68 12 40 f9")
         self.resolve_byte_sigs("_DERImg4DecodeFindInSequence", "6002803dfd7b44a9")
-        self.resolve_byte_sigs("_Img4DecodeCopyPayloadDigest", "? ? 02 91 e0 03 15 aa")
         self.resolve_byte_sigs("_DERImg4DecodeFindProperty", "00008052a80a43b2")
         self.resolve_byte_sigs("_DERDecodeSeqContentInit", "090440f90801098b")
         self.resolve_byte_sigs("_DERParseBitString", "080080d25f000039")
@@ -289,12 +300,13 @@ class SEPROMView(BinaryView):
         boot_check_panic = self.resolve_byte_sigs(
             "_boot_check_panic", "4900c0d20921a8f2"
         )
-        if boot_check_panic is not None:
+        if boot_check_panic:
             self.find_panic(boot_check_panic)
 
         img4decodegetpayload = self.resolve_byte_sigs(
             "_Img4DecodeGetPayload", "0081c93c2000803d"
         )
+
         image4_load = self.set_name_from_func_xref("_image4_load", img4decodegetpayload)
         self.set_name_from_func_xref("_load_sepos", image4_load)
 
@@ -307,7 +319,7 @@ class SEPROMView(BinaryView):
         self.define_function_at_address(read_ctrr_lock, "_read_ctrr_lock")
 
         img4_validate_property_callback = self.find_image4_validate_property_callback()
-        if img4_validate_property_callback is not None:
+        if img4_validate_property_callback:
             self.define_function_at_address(
                 img4_validate_property_callback.start,
                 "_img4_validate_property_callback",
@@ -327,4 +339,3 @@ class SEPROMView(BinaryView):
                 img4_verify_number_relation.start, "_image4_verify_number_relation"
             )
 
-        self.binary = b''
