@@ -176,9 +176,6 @@ class SEPROMView(BinaryView):
                 return functions[0].lowest_address
         return None
 
-    def perform_get_address_size(self) -> int:
-        return self.address_size
-
     def define_func_from_bytesignature(self, signature, func_name):
         ptr = self.start
         while ptr < self.end:
