@@ -30,8 +30,9 @@ class SEPROMView(BinaryView):
 
             self.platform = self.arch.standalone_platform
 
-            # let's compare version with A15 SEPROM which seems to be the only one with a new base addr
-            if self.version >= self.parse_version("520.400.46.200.4"):
+            if self.version >= self.parse_version("834.0.0.200.11"):
+                self.load_address = 0x2a0000000
+            elif self.version >= self.parse_version("520.400.46.200.4"):
                 self.load_address = 0x25C000000
             else:
                 self.load_address = 0x240000000
