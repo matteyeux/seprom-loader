@@ -83,7 +83,7 @@ class SEPROMView(BinaryView):
 
     def is_64b(self) -> bool:
         version = "1.2.3"
-        minimal_version = self.parse_version("323.0.0.1.15")  # First 64 bits SEPROM
+        minimal_version = self.parse_version("323.0.0.1.10")  # First 64 bits SEPROM
         rom_version = self.data.read(0xC00, 0x1C)
 
         if rom_version == b'\x00' * 0x1C:
