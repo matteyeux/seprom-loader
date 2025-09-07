@@ -14,12 +14,13 @@ from binaryninja.types import Symbol
 class SEPROMView(BinaryView):
     name = "SEPROM"
     long_name = "SEPROM"
-    load_address = 0x0
+    load_address = 0
 
     def __init__(self, data):
         BinaryView.__init__(self, parent_view=data, file_metadata=data.file)
         self.data = data
         self.version = ()
+        self.private_build = False
         self.is_64 = self.is_64b()
 
     def init(self) -> bool:
@@ -27,19 +28,14 @@ class SEPROMView(BinaryView):
 
         if self.is_64:
             self.arch = Architecture['aarch64']
-
-            self.platform = self.arch.standalone_platform
-
-            if self.version >= self.parse_version("834.0.0.200.11"):
-                self.load_address = 0x2a0000000
-            elif self.version >= self.parse_version("520.400.46.200.4"):
-                self.load_address = 0x25C000000
-            else:
-                self.load_address = 0x240000000
+            self.get_load_address()
         else:
             self.load_address = 0x10000000
             self.arch = Architecture['thumb2']
-            self.platform = self.arch.standalone_platform
+
+        print(f"load address: {hex(self.load_address)}")
+
+        self.platform = self.arch.standalone_platform
 
         self.add_auto_segment(
             self.load_address,
@@ -73,6 +69,32 @@ class SEPROMView(BinaryView):
         else:
             return False
 
+    def get_load_address(self) -> None:
+        # devices from A12 to M1 A0 share the same load address and do not have any version tag
+        if self.private_build:
+            self.load_address = 0x240000000
+            return
+
+        # set base addr based on version, each dumped SEPROM for different devices has a different version
+        # might be problematic if there is a similar SEPROM for 2 devices with a diffrent base addr
+        if self.version_str == "1386.0.8":
+            addr = 0x280000000
+        elif self.version_str == "838.0.0.300.9":  # M3 Max
+            addr = 0x388000000
+        elif self.version_str == "834.0.0.300.5" or self.version_str == "834.0.0.200.11":  # A17
+            addr = 0x2a0000000
+        elif self.version_str == "605.0.0.200.12" or self.version_str == "605.0.0.200.9":  # A16 
+            addr = 0x25c000000
+        elif self.version_str == "544.0.0.200.1" or self.version_str == "520.400.46.200.19" or self.version_str == "520.400.46.200.1":  # M2/A15
+            addr = 0x25c000000
+        elif self.version_str == "520.0.102.200.16" or self.version_str == "323.0.0.1.10" or self.version_str == "323.0.0.1.15":  # M1 B1/A11
+            addr = 0x240000000
+        else:
+            addr = 0
+
+        self.load_address = addr
+        return
+
     def parse_version(self, version: str) -> tuple:
         """https://stackoverflow.com/a/11887825."""
         version_list = [item.replace('\x00', '') for item in version.split(".")]
@@ -84,17 +106,20 @@ class SEPROMView(BinaryView):
     def is_64b(self) -> bool:
         version = "1.2.3"
         minimal_version = self.parse_version("323.0.0.1.10")  # First 64 bits SEPROM
-        rom_version = self.data.read(0xC00, 0x1C)
+        rom_version = self.data.read(0xC00, 31)
 
         if rom_version == b'\x00' * 0x1C:
             return False
 
         try:
-            version = rom_version.decode().replace("AppleSEPROM-", "")
+            cleaned = rom_version.split(b"\x00", 1)[0].decode()
+            version = cleaned.replace("AppleSEPROM-", "")
+            self.version_str = version
         except UnicodeDecodeError:
             self.version = version
 
         if b'private_build..' in rom_version:
+            self.private_build = True
             return True
         else:
             self.version = self.parse_version(version)
@@ -339,4 +364,3 @@ class SEPROMView(BinaryView):
             self.define_function_at_address(
                 img4_verify_number_relation.start, "_image4_verify_number_relation"
             )
-
